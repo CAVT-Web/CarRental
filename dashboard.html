@@ -25,8 +25,7 @@
     th { background-color: #007bff; color: white; }
     tr:nth-child(even) { background-color: #f2f2f2; }
 
-    .edit-btn { background-color: #28a745; color:white; border:none; padding:5px 10px; border-radius:5px; margin: 2px; }
-    .delete-btn { background-color: #dc3545; color:white; border:none; padding:5px 10px; border-radius:5px; margin: 2px; }
+    .edit-btn, .delete-btn { background-color: gray; color:white; border:none; padding:5px 10px; border-radius:5px; margin: 2px; }
   </style>
 </head>
 <body>
@@ -73,6 +72,9 @@
   </table>
 
   <script>
+    // رابط Google Sheets Script
+    const API_URL = "https://script.google.com/macros/s/AKfycbyxeV9U9uYZZZ13kWy6121Sz_0KhAsTFrvcmk-3zpwHrMf2rmjnnWlumM5oN1GjApfJ4g/exec";
+
     // حماية الصفحة
     if (localStorage.getItem("isLoggedIn") !== "true") {
       alert("🔐 يرجى تسجيل الدخول أولاً");
@@ -88,16 +90,25 @@
       window.location.href = "login.html";
     }
 
-    // تحميل وعرض الحجوزات
-    let bookings = JSON.parse(localStorage.getItem("bookings") || "[]");
     const tbody = document.querySelector("#bookingsTable tbody");
     const searchInput = document.getElementById("searchInput");
     const dateFilter = document.getElementById("dateFilter");
     const bookingCount = document.getElementById("bookingCount");
+    let bookings = [];
+
+    async function fetchBookings() {
+      try {
+        const response = await fetch(API_URL);
+        bookings = await response.json();
+        renderTable(bookings);
+      } catch (err) {
+        alert("حدث خطأ أثناء تحميل البيانات. تأكد من صحة الرابط.");
+      }
+    }
 
     function renderTable(data) {
       tbody.innerHTML = "";
-      data.forEach((booking, index) => {
+      data.forEach((booking) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td>${booking.name}</td>
@@ -106,12 +117,9 @@
           <td>${booking.start}</td>
           <td>${booking.end}</td>
           <td>${booking.location}</td>
-          <td>${booking.duration.replace("عدد الأيام: ","")}</td>
-          <td>${booking.total.replace("السعر الإجمالي: ","")}</td>
-          <td>
-            <button class="edit-btn" onclick="editBooking(${index})">تعديل</button>
-            <button class="delete-btn" onclick="deleteBooking(${index})">حذف</button>
-          </td>
+          <td>${booking.duration}</td>
+          <td>${booking.total}</td>
+          <td><span style="color:gray">غير متاح</span></td>
         `;
         tbody.appendChild(tr);
       });
@@ -131,29 +139,10 @@
       renderTable(filtered);
     }
 
-    function deleteBooking(index) {
-      if (confirm("🗑 هل أنت متأكد أنك تريد حذف هذا الحجز؟")) {
-        bookings.splice(index, 1);
-        localStorage.setItem("bookings", JSON.stringify(bookings));
-        filterBookings();
-      }
-    }
-
-    function editBooking(index) {
-      const data = bookings[index];
-      localStorage.setItem("editBooking", JSON.stringify({ ...data, index }));
-      window.location.href = "index.html";
-    }
-
     function exportToCSV() {
       const csvRows = [["الاسم", "الهاتف", "السيارة", "من", "إلى", "الموقع", "عدد الأيام", "السعر"]];
       bookings.forEach(b => {
-        csvRows.push([
-          b.name, b.phone, b.car, b.start, b.end,
-          b.location,
-          b.duration.replace("عدد الأيام: ",""),
-          b.total.replace("السعر الإجمالي: ","")
-        ]);
+        csvRows.push([b.name, b.phone, b.car, b.start, b.end, b.location, b.duration, b.total]);
       });
       const csvContent = csvRows.map(row => row.join(",")).join("\n");
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -174,8 +163,8 @@
       const dataRows = bookings.map(b => [
         b.name, b.phone, b.car, b.start, b.end,
         b.location,
-        b.duration.replace("عدد الأيام: ",""),
-        b.total.replace("السعر الإجمالي: ","")
+        b.duration,
+        b.total
       ]);
 
       const allRows = headers.concat(dataRows);
@@ -198,10 +187,7 @@
 
     searchInput.addEventListener("input", filterBookings);
     dateFilter.addEventListener("change", filterBookings);
-
-    // عرض أولي
-    renderTable(bookings);
+    window.onload = fetchBookings;
   </script>
-
 </body>
 </html>
